@@ -1,3 +1,4 @@
+#nullable enable
 using CornerStore.Models;
 using CornerStore.Models.DTOs;
 using Microsoft.EntityFrameworkCore;
@@ -73,6 +74,30 @@ app.MapGet("/api/cashiers/{id}", async (int id, CornerStoreDbContext dbContext) 
     return Results.Ok(cashierDetails);
 });
 
+//Get all products with categories. If the search query string param is present, return only products whose names or category names include the search value (ignore case).
+app.MapGet("/api/products", async (string? search, CornerStoreDbContext dbContext) =>
+{
+    var products = dbContext.Products
+        .Include(p => p.Category)
+        .Select(p => new
+        {
+            p.Id,
+            p.ProductName,
+            p.Price,
+            p.Brand,
+            Category = p.Category.CategoryName
+        });
+
+    if (!string.IsNullOrWhiteSpace(search))
+    {
+        search = search.ToLower();
+        products = products.Where(p =>
+            p.ProductName.ToLower().Contains(search) ||
+            p.Category.ToLower().Contains(search));
+    }
+
+    return Results.Ok(await products.ToListAsync());
+});
 
 
 ////Post Endpoints
@@ -103,7 +128,75 @@ app.MapPost("/api/cashiers", async (CashierDTO cashierDTO, CornerStoreDbContext 
     });
 });
 
+//Add a product
+app.MapPost("/api/products", async (ProductDTO productDTO, CornerStoreDbContext dbContext) =>
+{
 
+    if (string.IsNullOrWhiteSpace(productDTO.ProductName) ||
+        string.IsNullOrWhiteSpace(productDTO.Brand) ||
+        productDTO.Price <= 0 ||
+        productDTO.CategoryId <= 0)
+    {
+        return Results.BadRequest(new { Message = "Invalid product data. Please check the input fields." });
+    }
+
+    var category = await dbContext.Categories.FindAsync(productDTO.CategoryId);
+    if (category == null)
+    {
+        return Results.NotFound(new { Message = $"Category with ID {productDTO.CategoryId} not found." });
+    }
+
+    var product = new Product
+    {
+        ProductName = productDTO.ProductName,
+        Price = productDTO.Price,
+        Brand = productDTO.Brand,
+        CategoryId = productDTO.CategoryId
+    };
+
+
+    dbContext.Products.Add(product);
+    await dbContext.SaveChangesAsync();
+
+
+    return Results.Created($"/api/products/{product.Id}", new
+    {
+        product.Id,
+        product.ProductName,
+        product.Price,
+        product.Brand,
+        Category = category.CategoryName
+    });
+});
+
+
+////Put Endpoints
+
+//Update a product
+app.MapPut("/api/products/{id}", async (int id, Product productInput, CornerStoreDbContext dbContext) =>
+{
+
+    var product = await dbContext.Products.FindAsync(id);
+    if (product == null)
+    {
+        return Results.NotFound(new { Message = $"Product with ID {id} not found." });
+    }
+
+    var category = await dbContext.Categories.FindAsync(productInput.CategoryId);
+    if (category == null)
+    {
+        return Results.NotFound(new { Message = $"Category with ID {productInput.CategoryId} not found." });
+    }
+
+    product.ProductName = productInput.ProductName;
+    product.Price = productInput.Price;
+    product.Brand = productInput.Brand;
+    product.CategoryId = productInput.CategoryId;
+
+    await dbContext.SaveChangesAsync();
+
+    return Results.Ok(product);
+});
 
 
 
