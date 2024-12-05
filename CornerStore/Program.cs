@@ -1,7 +1,9 @@
 using CornerStore.Models;
+using CornerStore.Models.DTOs;
 using Microsoft.EntityFrameworkCore;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Http.Json;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -33,6 +35,40 @@ if (app.Environment.IsDevelopment())
 app.UseHttpsRedirection();
 
 //endpoints go here
+
+
+////Post Endpoints
+
+//Add a cashier
+app.MapPost("/api/cashiers", async (CashierDTO cashierDTO, CornerStoreDbContext dbContext) =>
+{
+    if (string.IsNullOrWhiteSpace(cashierDTO.FirstName) || string.IsNullOrWhiteSpace(cashierDTO.LastName))
+    {
+        return Results.BadRequest(new { Message = "FirstName and LastName are required." });
+    }
+
+    var cashier = new Cashier
+    {
+        FirstName = cashierDTO.FirstName,
+        LastName = cashierDTO.LastName
+    };
+
+    dbContext.Cashiers.Add(cashier);
+    await dbContext.SaveChangesAsync();
+
+    return Results.Created($"/api/cashiers/{cashier.Id}", new
+    {
+        cashier.Id,
+        cashier.FirstName,
+        cashier.LastName,
+        FullName = $"{cashier.FirstName} {cashier.LastName}"
+    });
+});
+
+
+
+
+
 
 app.Run();
 
