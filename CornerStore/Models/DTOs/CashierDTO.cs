@@ -1,9 +1,9 @@
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
-namespace CornerStore.Models
+namespace CornerStore.Models.DTOs
 {
-    public class Cashier
+    public class CashierDTO
     {
         public int Id { get; set; }
 

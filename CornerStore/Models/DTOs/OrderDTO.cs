@@ -2,9 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace CornerStore.Models
+namespace CornerStore.Models.DTOs
 {
-    public class Order
+    public class OrderDTO
     {
         public int Id { get; set; }
 
