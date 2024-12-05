@@ -36,6 +36,44 @@ app.UseHttpsRedirection();
 
 //endpoints go here
 
+//Get a cashier (include their orders, and the orders' products)
+app.MapGet("/api/cashiers/{id}", async (int id, CornerStoreDbContext dbContext) =>
+{
+
+    var cashierDetails = await dbContext.Cashiers
+        .Where(c => c.Id == id)
+        .Select(c => new
+        {
+            c.Id,
+            c.FirstName,
+            c.LastName,
+            FullName = $"{c.FirstName} {c.LastName}",
+            Orders = c.Orders.Select(o => new
+            {
+                o.Id,
+                o.PaidOnDate,
+                o.Total,
+                Products = o.OrderProducts.Select(op => new
+                {
+                    op.Product.Id,
+                    op.Product.ProductName,
+                    op.Product.Brand,
+                    op.Product.Price,
+                    op.Quantity
+                }).ToList()
+            }).ToList()
+        })
+        .FirstOrDefaultAsync();
+
+    if (cashierDetails == null)
+    {
+        return Results.NotFound(new { Message = $"Cashier with ID {id} not found." });
+    }
+
+    return Results.Ok(cashierDetails);
+});
+
+
 
 ////Post Endpoints
 
