@@ -1,4 +1,3 @@
-#nullable enable
 using CornerStore.Models;
 using CornerStore.Models.DTOs;
 using Microsoft.EntityFrameworkCore;
@@ -99,6 +98,83 @@ app.MapGet("/api/products", async (string? search, CornerStoreDbContext dbContex
     return Results.Ok(await products.ToListAsync());
 });
 
+//Get an order details, including the cashier, order products, and products on the order with their category.
+app.MapGet("/api/orders/{id}", async (int id, CornerStoreDbContext dbContext) =>
+{
+
+    var order = await dbContext.Orders
+        .Include(o => o.Cashier)
+        .Include(o => o.OrderProducts)
+        .ThenInclude(op => op.Product)
+        .ThenInclude(p => p.Category)
+        .FirstOrDefaultAsync(o => o.Id == id);
+
+    if (order == null)
+    {
+        return Results.NotFound(new { Message = $"Order with ID {id} not found." });
+    }
+
+    var response = new
+    {
+        OrderId = order.Id,
+        order.PaidOnDate,
+        order.Total,
+        Cashier = new
+        {
+            order.Cashier.Id,
+            order.Cashier.FullName
+        },
+        Products = order.OrderProducts.Select(op => new
+        {
+            op.Product.Id,
+            op.Product.ProductName,
+            op.Product.Price,
+            op.Quantity,
+            Category = op.Product.Category.CategoryName
+        }).ToList()
+    };
+
+    return Results.Ok(response);
+});
+
+//Get all orders. Check for a query string param orderDate that only returns orders from a particular day. If it is not present, return all orders.
+app.MapGet("/api/orders", async (DateTime? orderDate, CornerStoreDbContext dbContext) =>
+{
+    var query = dbContext.Orders
+        .Include(o => o.Cashier)
+        .Include(o => o.OrderProducts)
+        .ThenInclude(op => op.Product)
+        .ThenInclude(p => p.Category)
+        .AsQueryable();
+
+    if (orderDate.HasValue)
+    {
+        query = query.Where(o => o.PaidOnDate.HasValue && o.PaidOnDate.Value.Date == orderDate.Value.Date);
+    }
+
+    var orders = await query.Select(o => new
+    {
+        o.Id,
+        o.PaidOnDate,
+        o.Total,
+        Cashier = new
+        {
+            o.Cashier.Id,
+            o.Cashier.FullName
+        },
+        Products = o.OrderProducts.Select(op => new
+        {
+            op.Product.Id,
+            op.Product.ProductName,
+            op.Quantity,
+            op.Product.Price,
+            Category = op.Product.Category.CategoryName
+        }).ToList()
+    }).ToListAsync();
+
+    return Results.Ok(orders);
+});
+
 
 ////Post Endpoints
 
@@ -170,6 +246,54 @@ app.MapPost("/api/products", async (ProductDTO productDTO, CornerStoreDbContext 
 });
 
 
+//Create an Order (with products!)
+app.MapPost("/api/orders", async (OrderCreateDTO orderDTO, CornerStoreDbContext dbContext) =>
+{
+    var cashier = await dbContext.Cashiers.FindAsync(orderDTO.CashierId);
+    if (cashier == null)
+    {
+        return Results.NotFound(new { Message = $"Cashier with ID {orderDTO.CashierId} not found." });
+    }
+
+    var productIds = orderDTO.Products.Select(p => p.ProductId).ToList();
+    var products = await dbContext.Products.Where(p => productIds.Contains(p.Id)).ToListAsync();
+
+    if (products.Count != productIds.Count)
+    {
+        return Results.BadRequest(new { Message = "Some products in the order do not exist." });
+    }
+
+    var order = new Order
+    {
+        CashierId = orderDTO.CashierId,
+        PaidOnDate = orderDTO.PaidOnDate,
+        OrderProducts = orderDTO.Products.Select(op => new OrderProduct
+        {
+            ProductId = op.ProductId,
+            Quantity = op.Quantity
+        }).ToList()
+    };
+
+    dbContext.Orders.Add(order);
+    await dbContext.SaveChangesAsync();
+
+    return Results.Created($"/api/orders/{order.Id}", new
+    {
+        OrderId = order.Id,
+        Cashier = new { cashier.Id, FullName = cashier.FullName },
+        order.PaidOnDate,
+        Products = order.OrderProducts.Select(op => new
+        {
+            op.Product.Id,
+            op.Product.ProductName,
+            op.Quantity,
+            op.Product.Price,
+            TotalPrice = op.Quantity * op.Product.Price
+        }).ToList(),
+        order.Total
+    });
+});
+
 ////Put Endpoints
 
 //Update a product
@@ -199,6 +323,29 @@ app.MapPut("/api/products/{id}", async (int id, Product productInput, CornerStor
 });
 
 
+////Delete Endpoints
+
+//Delete an order
+app.MapDelete("/api/orders/{id}", async (int id, CornerStoreDbContext dbContext) =>
+{
+
+    var order = await dbContext.Orders
+        .Include(o => o.OrderProducts)
+        .FirstOrDefaultAsync(o => o.Id == id);
+
+    if (order == null)
+    {
+        return Results.NotFound(new { Message = $"Order with ID {id} not found." });
+    }
+
+    dbContext.OrderProducts.RemoveRange(order.OrderProducts);
+
+    dbContext.Orders.Remove(order);
+
+    await dbContext.SaveChangesAsync();
+
+    return Results.Ok(new { Message = $"Order with ID {id} successfully deleted." });
+});
 
 
 app.Run();
