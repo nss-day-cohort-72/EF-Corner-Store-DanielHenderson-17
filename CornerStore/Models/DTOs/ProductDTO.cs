@@ -14,6 +14,6 @@ namespace CornerStore.Models.DTOs
 
         [Required]
         public int CategoryId { get; set; }
-        public Category Category { get; set; }
+        public CategoryDTO Category { get; set; }
     }
 }

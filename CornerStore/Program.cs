@@ -195,13 +195,7 @@ app.MapPost("/api/cashiers", async (CashierDTO cashierDTO, CornerStoreDbContext 
     dbContext.Cashiers.Add(cashier);
     await dbContext.SaveChangesAsync();
 
-    return Results.Created($"/api/cashiers/{cashier.Id}", new
-    {
-        cashier.Id,
-        cashier.FirstName,
-        cashier.LastName,
-        FullName = $"{cashier.FirstName} {cashier.LastName}"
-    });
+    return Results.Ok(cashier);
 });
 
 //Add a product
@@ -325,7 +319,11 @@ app.MapPut("/api/products/{id}", async (int id, ProductUpdateDTO productInput, C
         Price = product.Price,
         Brand = product.Brand,
         CategoryId = product.CategoryId,
-        Category = category
+        Category = new CategoryDTO
+        {
+            Id = category.Id,
+            CategoryName = category.CategoryName
+        }
     };
 
     return Results.Ok(updatedProduct);
