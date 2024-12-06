@@ -297,9 +297,8 @@ app.MapPost("/api/orders", async (OrderCreateDTO orderDTO, CornerStoreDbContext 
 ////Put Endpoints
 
 //Update a product
-app.MapPut("/api/products/{id}", async (int id, Product productInput, CornerStoreDbContext dbContext) =>
+app.MapPut("/api/products/{id}", async (int id, ProductUpdateDTO productInput, CornerStoreDbContext dbContext) =>
 {
-
     var product = await dbContext.Products.FindAsync(id);
     if (product == null)
     {
@@ -319,8 +318,19 @@ app.MapPut("/api/products/{id}", async (int id, Product productInput, CornerStor
 
     await dbContext.SaveChangesAsync();
 
-    return Results.Ok(product);
+    var updatedProduct = new ProductDTO
+    {
+        Id = product.Id,
+        ProductName = product.ProductName,
+        Price = product.Price,
+        Brand = product.Brand,
+        CategoryId = product.CategoryId,
+        Category = category
+    };
+
+    return Results.Ok(updatedProduct);
 });
+
 
 
 ////Delete Endpoints
