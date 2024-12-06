@@ -15,6 +15,9 @@ namespace CornerStore.Models.DTOs
 
         public List<OrderProduct> OrderProducts { get; set; } = new List<OrderProduct>();
 
+
+
+        //Here we are going to sum up the total cost of all products in an order. Each product’s total cost is Quantity * Product.Price, and these are all added together to get a final total.
         public decimal Total
         {
             get
